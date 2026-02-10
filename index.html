@@ -3,387 +3,150 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marine Protected Areas - Global Fishing Effort</title>
+    <title>Snake</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: #0a0e1a;
-            color: #e0e0e0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            overflow: hidden;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             height: 100vh;
+            background: #111;
+            font-family: monospace;
+            color: #0f0;
         }
-        #container { width: 100%; height: 100vh; position: relative; }
-        canvas { display: block; cursor: grab; }
-        canvas:active { cursor: grabbing; }
-        #tooltip {
-            position: absolute;
-            background: rgba(10, 14, 26, 0.92);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 6px;
-            padding: 10px 14px;
-            font-size: 13px;
-            pointer-events: none;
-            display: none;
-            max-width: 320px;
-            line-height: 1.5;
-            backdrop-filter: blur(8px);
+        canvas {
+            border: 2px solid #0f0;
         }
-        #tooltip .mpa-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
-        #tooltip .fully { color: #e8803a; }
-        #tooltip .highly { color: #5bb8a6; }
-        #legend {
-            position: absolute;
-            bottom: 24px;
-            left: 24px;
-            background: rgba(10, 14, 26, 0.85);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px;
-            padding: 14px 18px;
-            font-size: 13px;
-            line-height: 1.8;
-            backdrop-filter: blur(8px);
-        }
-        #legend .dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 6px;
-            vertical-align: middle;
-        }
-        #legend .dot.fully { background: #e8803a; }
-        #legend .dot.highly { background: #5bb8a6; }
-        #title {
+        #score {
             position: absolute;
             top: 20px;
-            left: 24px;
-            font-size: 20px;
-            font-weight: 600;
+            font-size: 24px;
         }
-        #subtitle {
+        #message {
             position: absolute;
-            top: 48px;
-            left: 24px;
-            font-size: 13px;
-            color: #888;
+            font-size: 28px;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <canvas id="globe"></canvas>
-        <div id="title">Marine Protected Areas</div>
-        <div id="subtitle">Fishing effort in fully- and highly-protected MPAs worldwide</div>
-        <div id="tooltip"></div>
-        <div id="legend">
-            <div><span class="dot fully"></span> Fully-protected</div>
-            <div><span class="dot highly"></span> Highly-protected</div>
-            <div style="margin-top:6px; color:#888; font-size:11px;">Circle size = MPA area<br>Opacity = fishing hours / 100 km&sup2;</div>
-        </div>
-    </div>
-
+    <div id="score">Score: 0</div>
+    <canvas id="game" width="400" height="400"></canvas>
+    <div id="message"></div>
     <script>
-    (async function() {
-        const canvas = document.getElementById('globe');
+        const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
-        const tooltip = document.getElementById('tooltip');
+        const scoreEl = document.getElementById('score');
+        const messageEl = document.getElementById('message');
+        const gridSize = 20;
+        const tileCount = canvas.width / gridSize;
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+        let snake, direction, nextDirection, food, score, gameOver, intervalId;
+
+        function init() {
+            snake = [{ x: 10, y: 10 }];
+            direction = { x: 0, y: 0 };
+            nextDirection = { x: 0, y: 0 };
+            score = 0;
+            gameOver = false;
+            messageEl.style.display = 'none';
+            placeFood();
+            if (intervalId) clearInterval(intervalId);
+            intervalId = setInterval(update, 100);
         }
-        resize();
-        window.addEventListener('resize', resize);
 
-        // Load data
-        const resp = await fetch('docs/globe_data.csv');
-        const text = await resp.text();
-        const lines = text.trim().split('\n');
-        const headers = lines[0].split(',');
-        const mpas = lines.slice(1).map(line => {
-            const vals = [];
-            let current = '';
-            let inQuotes = false;
-            for (const ch of line) {
-                if (ch === '"') { inQuotes = !inQuotes; }
-                else if (ch === ',' && !inQuotes) { vals.push(current); current = ''; }
-                else { current += ch; }
+        function placeFood() {
+            do {
+                food = {
+                    x: Math.floor(Math.random() * tileCount),
+                    y: Math.floor(Math.random() * tileCount)
+                };
+            } while (snake.some(s => s.x === food.x && s.y === food.y));
+        }
+
+        function update() {
+            if (gameOver) return;
+
+            direction = { ...nextDirection };
+
+            if (direction.x === 0 && direction.y === 0) {
+                draw();
+                return;
             }
-            vals.push(current);
-            return {
-                name: vals[0],
-                country: vals[1],
-                protection: vals[2],
-                area_km2: parseFloat(vals[3]),
-                fishing: parseFloat(vals[4]),
-                lon: parseFloat(vals[5]) * Math.PI / 180,
-                lat: parseFloat(vals[6]) * Math.PI / 180
+
+            const head = {
+                x: snake[0].x + direction.x,
+                y: snake[0].y + direction.y
             };
-        });
 
-        // Load world coastline GeoJSON
-        const worldResp = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json');
-        const worldTopo = await worldResp.json();
-
-        // Decode TopoJSON arcs
-        function decodeArcs(topo) {
-            const transform = topo.transform;
-            const decoded = [];
-            for (const arc of topo.arcs) {
-                const coords = [];
-                let x = 0, y = 0;
-                for (const [dx, dy] of arc) {
-                    x += dx;
-                    y += dy;
-                    coords.push([
-                        x * transform.scale[0] + transform.translate[0],
-                        y * transform.scale[1] + transform.translate[1]
-                    ]);
-                }
-                decoded.push(coords);
-            }
-            return decoded;
-        }
-
-        function arcToCoords(arcs, decodedArcs) {
-            const rings = [];
-            for (const ring of arcs) {
-                const coords = [];
-                for (const idx of ring) {
-                    const arc = idx >= 0 ? decodedArcs[idx] : decodedArcs[~idx].slice().reverse();
-                    for (let i = coords.length > 0 ? 1 : 0; i < arc.length; i++) {
-                        coords.push(arc[i]);
-                    }
-                }
-                rings.push(coords);
-            }
-            return rings;
-        }
-
-        const decodedArcs = decodeArcs(worldTopo);
-        const landObj = worldTopo.objects.land;
-        const landPolygons = [];
-
-        function extractGeometry(geom) {
-            if (geom.type === 'GeometryCollection') {
-                for (const g of geom.geometries) extractGeometry(g);
-            } else if (geom.type === 'Polygon') {
-                landPolygons.push(arcToCoords(geom.arcs, decodedArcs));
-            } else if (geom.type === 'MultiPolygon') {
-                for (const poly of geom.arcs) {
-                    landPolygons.push(arcToCoords(poly, decodedArcs));
-                }
-            }
-        }
-        extractGeometry(landObj);
-
-        // Globe state
-        let rotX = -0.3; // latitude rotation
-        let rotY = 0.5;  // longitude rotation
-        let radius;
-        let dragging = false;
-        let lastMouse = { x: 0, y: 0 };
-        let autoRotate = true;
-
-        canvas.addEventListener('mousedown', e => {
-            dragging = true;
-            autoRotate = false;
-            lastMouse = { x: e.clientX, y: e.clientY };
-        });
-        canvas.addEventListener('mousemove', e => {
-            if (dragging) {
-                const dx = e.clientX - lastMouse.x;
-                const dy = e.clientY - lastMouse.y;
-                rotY += dx * 0.005;
-                rotX -= dy * 0.005;
-                rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotX));
-                lastMouse = { x: e.clientX, y: e.clientY };
-            }
-            // Tooltip
-            updateTooltip(e.clientX, e.clientY);
-        });
-        canvas.addEventListener('mouseup', () => { dragging = false; });
-        canvas.addEventListener('mouseleave', () => { dragging = false; tooltip.style.display = 'none'; });
-
-        // Project 3D point to 2D
-        function project(lon, lat) {
-            const x3d = Math.cos(lat) * Math.cos(lon + rotY);
-            const y3d = Math.cos(lat) * Math.sin(lon + rotY);
-            const z3d = Math.sin(lat);
-            // Rotate around X axis
-            const y3r = y3d * Math.cos(rotX) - z3d * Math.sin(rotX);
-            const z3r = y3d * Math.sin(rotX) + z3d * Math.cos(rotX);
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
-            return {
-                x: cx + radius * y3r,
-                y: cy - radius * z3r,
-                visible: x3d > 0
-            };
-        }
-
-        function drawGlobe() {
-            radius = Math.min(canvas.width, canvas.height) * 0.42;
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Globe background
-            const grad = ctx.createRadialGradient(cx - radius * 0.15, cy - radius * 0.15, radius * 0.05, cx, cy, radius);
-            grad.addColorStop(0, '#1a2040');
-            grad.addColorStop(1, '#0d1020');
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-            ctx.fillStyle = grad;
-            ctx.fill();
-
-            // Graticule
-            ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-            ctx.lineWidth = 0.5;
-            for (let lat = -80; lat <= 80; lat += 20) {
-                ctx.beginPath();
-                let started = false;
-                for (let lon = -180; lon <= 180; lon += 2) {
-                    const p = project(lon * Math.PI / 180, lat * Math.PI / 180);
-                    if (p.visible) {
-                        if (!started) { ctx.moveTo(p.x, p.y); started = true; }
-                        else ctx.lineTo(p.x, p.y);
-                    } else { started = false; }
-                }
-                ctx.stroke();
-            }
-            for (let lon = -180; lon < 180; lon += 30) {
-                ctx.beginPath();
-                let started = false;
-                for (let lat = -90; lat <= 90; lat += 2) {
-                    const p = project(lon * Math.PI / 180, lat * Math.PI / 180);
-                    if (p.visible) {
-                        if (!started) { ctx.moveTo(p.x, p.y); started = true; }
-                        else ctx.lineTo(p.x, p.y);
-                    } else { started = false; }
-                }
-                ctx.stroke();
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                endGame();
+                return;
             }
 
-            // Land masses
-            ctx.fillStyle = 'rgba(180, 180, 170, 0.25)';
-            ctx.strokeStyle = 'rgba(200, 200, 190, 0.35)';
-            ctx.lineWidth = 0.5;
-            for (const poly of landPolygons) {
-                for (const ring of poly) {
-                    ctx.beginPath();
-                    let started = false;
-                    let allVisible = true;
-                    const projected = ring.map(([lon, lat]) => {
-                        const p = project(lon * Math.PI / 180, lat * Math.PI / 180);
-                        if (!p.visible) allVisible = false;
-                        return p;
-                    });
-                    if (!allVisible) {
-                        // Draw partial
-                        for (const p of projected) {
-                            if (p.visible) {
-                                if (!started) { ctx.moveTo(p.x, p.y); started = true; }
-                                else ctx.lineTo(p.x, p.y);
-                            } else { started = false; }
-                        }
-                        if (started) ctx.stroke();
-                    } else {
-                        ctx.beginPath();
-                        ctx.moveTo(projected[0].x, projected[0].y);
-                        for (let i = 1; i < projected.length; i++) {
-                            ctx.lineTo(projected[i].x, projected[i].y);
-                        }
-                        ctx.closePath();
-                        ctx.fill();
-                        ctx.stroke();
-                    }
-                }
+            if (snake.some(s => s.x === head.x && s.y === head.y)) {
+                endGame();
+                return;
             }
 
-            // MPA points
-            const maxArea = Math.max(...mpas.map(m => m.area_km2));
-            const maxFishing = Math.max(...mpas.filter(m => m.fishing > 0).map(m => m.fishing));
+            snake.unshift(head);
 
-            // Sort by size descending so small ones render on top
-            const sorted = [...mpas].sort((a, b) => b.area_km2 - a.area_km2);
-
-            for (const mpa of sorted) {
-                const p = project(mpa.lon, mpa.lat);
-                if (!p.visible) continue;
-
-                const r = Math.max(2.5, Math.sqrt(mpa.area_km2 / maxArea) * 18);
-                const alpha = mpa.fishing > 0
-                    ? 0.35 + 0.55 * Math.min(1, mpa.fishing / (maxFishing * 0.3))
-                    : 0.3;
-
-                if (mpa.protection === 'fully-protected') {
-                    ctx.fillStyle = `rgba(232, 128, 58, ${alpha})`;
-                    ctx.strokeStyle = `rgba(232, 128, 58, ${Math.min(1, alpha + 0.2)})`;
-                } else {
-                    ctx.fillStyle = `rgba(91, 184, 166, ${alpha})`;
-                    ctx.strokeStyle = `rgba(91, 184, 166, ${Math.min(1, alpha + 0.2)})`;
-                }
-
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.lineWidth = 0.5;
-                ctx.stroke();
-            }
-
-            // Globe outline
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-        }
-
-        // Tooltip on hover
-        const projectedPoints = [];
-        function updateTooltip(mx, my) {
-            let closest = null;
-            let closestDist = 20;
-            const maxArea = Math.max(...mpas.map(m => m.area_km2));
-
-            for (const mpa of mpas) {
-                const p = project(mpa.lon, mpa.lat);
-                if (!p.visible) continue;
-                const r = Math.max(2.5, Math.sqrt(mpa.area_km2 / maxArea) * 18);
-                const d = Math.sqrt((p.x - mx) ** 2 + (p.y - my) ** 2);
-                if (d < Math.max(r, 8) && d < closestDist) {
-                    closest = mpa;
-                    closestDist = d;
-                }
-            }
-
-            if (closest) {
-                const cls = closest.protection === 'fully-protected' ? 'fully' : 'highly';
-                tooltip.innerHTML = `
-                    <div class="mpa-name">${closest.name}</div>
-                    <div>${closest.country}</div>
-                    <div class="${cls}">${closest.protection}</div>
-                    <div>Area: ${closest.area_km2.toLocaleString()} km&sup2;</div>
-                    <div>Fishing: ${closest.fishing.toFixed(2)} hrs / 100 km&sup2; / yr</div>
-                `;
-                tooltip.style.display = 'block';
-                tooltip.style.left = (mx + 16) + 'px';
-                tooltip.style.top = (my - 10) + 'px';
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                scoreEl.textContent = 'Score: ' + score;
+                placeFood();
             } else {
-                tooltip.style.display = 'none';
+                snake.pop();
             }
+
+            draw();
         }
 
-        function animate() {
-            if (autoRotate) rotY += 0.002;
-            drawGlobe();
-            requestAnimationFrame(animate);
+        function draw() {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#f00';
+            ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 1, gridSize - 1);
+
+            snake.forEach((segment, i) => {
+                ctx.fillStyle = i === 0 ? '#0f0' : '#0a0';
+                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 1, gridSize - 1);
+            });
         }
-        animate();
-    })();
+
+        function endGame() {
+            gameOver = true;
+            clearInterval(intervalId);
+            messageEl.textContent = 'Game Over! Press Space to restart';
+            messageEl.style.display = 'block';
+        }
+
+        document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowUp':
+                    if (direction.y !== 1) nextDirection = { x: 0, y: -1 };
+                    break;
+                case 'ArrowDown':
+                    if (direction.y !== -1) nextDirection = { x: 0, y: 1 };
+                    break;
+                case 'ArrowLeft':
+                    if (direction.x !== 1) nextDirection = { x: -1, y: 0 };
+                    break;
+                case 'ArrowRight':
+                    if (direction.x !== -1) nextDirection = { x: 1, y: 0 };
+                    break;
+                case ' ':
+                    if (gameOver) init();
+                    break;
+            }
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+
+        init();
     </script>
 </body>
 </html>
