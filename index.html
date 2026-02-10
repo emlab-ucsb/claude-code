@@ -3,149 +3,150 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Coding Agents</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+    <title>Snake</title>
     <style>
-        .reveal h1, .reveal h2, .reveal h3 { text-transform: none; }
-        .reveal pre { font-size: 0.45em; width: 95%; }
-        .reveal code { font-family: 'Menlo', 'Courier New', monospace; }
-        .reveal section img {
-            max-height: 70vh;
-            border: none;
-            box-shadow: none;
-            background: none;
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #111;
+            font-family: monospace;
+            color: #0f0;
         }
-        .reveal .full-img img {
-            max-height: 85vh;
-            max-width: 95vw;
-            object-fit: contain;
+        canvas {
+            border: 2px solid #0f0;
         }
-        .reveal .timeline {
-            text-align: left;
-            font-size: 0.7em;
+        #score {
+            position: absolute;
+            top: 20px;
+            font-size: 24px;
         }
-        .reveal .timeline td {
-            padding: 0.2em 0.6em;
-            vertical-align: top;
-        }
-        .reveal .timeline .time {
-            font-family: 'Menlo', monospace;
-            color: #42affa;
-            white-space: nowrap;
-        }
-        .reveal .prompt-box {
-            background: #1a1a2e;
-            border: 1px solid #42affa;
-            border-radius: 8px;
-            padding: 1em 1.2em;
-            font-size: 0.48em;
-            text-align: left;
-            font-family: 'Menlo', monospace;
-            line-height: 1.5;
-            color: #e0e0e0;
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-        .reveal .prompt-box .prompt-label {
-            color: #42affa;
-            font-weight: bold;
-            margin-bottom: 0.5em;
-            display: block;
+        #message {
+            position: absolute;
+            font-size: 28px;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="reveal">
-        <div class="slides">
-
-            <!-- Slide 1: Title -->
-            <section>
-                <h1>AI Coding Agents</h1>
-                <h3>A live demo with Claude Code</h3>
-                <p><small>emLab | Feb 10, 2026</small></p>
-            </section>
-
-            <!-- Slide 2: What are AI coding agents? -->
-            <section>
-                <h2>What are AI coding agents?</h2>
-                <ul>
-                    <li>LLMs that can <em>read, write, and run</em> code</li>
-                    <li>Operate in a loop: plan &rarr; act &rarr; observe &rarr; repeat</li>
-                    <li>Access to tools: file system, terminal, browser, APIs</li>
-                    <li>Examples: Claude Code, GitHub Copilot agent, Cursor, Windsurf</li>
-                </ul>
-            </section>
-
-            <!-- Slide 3: Why Claude? -->
-            <section>
-                <h2>Why Claude?</h2>
-                <ul>
-                    <li>State-of-the-art on coding benchmarks (SWE-bench, LiveBench, etc.)</li>
-                    <li>Claude Code &mdash; a CLI and VS Code extension by Anthropic</li>
-                    <li>Agentic: reads files, runs commands, searches the web, makes commits</li>
-                    <li>Integrates with GitHub, MCP servers, and custom tools</li>
-                </ul>
-            </section>
-
-            <!-- Slide 4: LiveBench screenshot 1 -->
-            <section class="full-img">
-                <h3>LiveBench LLM Benchmark</h3>
-                <img src="docs/livebench-overview.png" alt="LiveBench benchmark overview">
-            </section>
-
-            <!-- Slide 5: LiveBench screenshot 2 -->
-            <section class="full-img">
-                <h3>LiveBench Leaderboard</h3>
-                <img src="docs/livebench-leaderboard.png" alt="LiveBench leaderboard table">
-            </section>
-
-            <!-- Slide 6: How this presentation was made -->
-            <section>
-                <h2>How was this presentation made?</h2>
-                <table class="timeline">
-                    <tr>
-                        <td class="time">11:32 AM</td>
-                        <td>Created repo &amp; assigned a GitHub Copilot agent to scaffold an <code>index.html</code></td>
-                    </tr>
-                    <tr>
-                        <td class="time">11:40 AM</td>
-                        <td>Copilot opened PR #1 with a "Hello World" page; merged</td>
-                    </tr>
-                    <tr>
-                        <td class="time">11:42 AM</td>
-                        <td>Used Claude Code to reorganize files &mdash; then reverted (learning moment!)</td>
-                    </tr>
-                    <tr>
-                        <td class="time">11:52 AM</td>
-                        <td>Took screenshots of LiveBench for slides</td>
-                    </tr>
-                    <tr>
-                        <td class="time">11:58 AM</td>
-                        <td>Prompted Claude Code to turn <code>index.html</code> into this reveal.js presentation &rarr;</td>
-                    </tr>
-                </table>
-            </section>
-
-            <!-- Slide 7: The prompt -->
-            <section>
-                <h2>The prompt (11:58 AM)</h2>
-                <div class="prompt-box">
-                    <span class="prompt-label">&gt; User prompt to Claude Code:</span>
-                    Make index.html into a reveal.js presentation with a few (no more than 10, less ideal) slides about Claude Code. This is a presentation about using AI coding agents. Include the two screenshots in docs/ as full page slides. For the last slide or two, explain the process of how this presentation was made. Check the commit history for the timeline of preparation and other info. For the last slide, include this prompt with a timestamp of 11:58 AM!
-                </div>
-            </section>
-
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+    <div id="score">Score: 0</div>
+    <canvas id="game" width="400" height="400"></canvas>
+    <div id="message"></div>
     <script>
-        Reveal.initialize({
-            hash: true,
-            transition: 'slide',
-            center: true
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const messageEl = document.getElementById('message');
+        const gridSize = 20;
+        const tileCount = canvas.width / gridSize;
+
+        let snake, direction, nextDirection, food, score, gameOver, intervalId;
+
+        function init() {
+            snake = [{ x: 10, y: 10 }];
+            direction = { x: 0, y: 0 };
+            nextDirection = { x: 0, y: 0 };
+            score = 0;
+            gameOver = false;
+            messageEl.style.display = 'none';
+            placeFood();
+            if (intervalId) clearInterval(intervalId);
+            intervalId = setInterval(update, 100);
+        }
+
+        function placeFood() {
+            do {
+                food = {
+                    x: Math.floor(Math.random() * tileCount),
+                    y: Math.floor(Math.random() * tileCount)
+                };
+            } while (snake.some(s => s.x === food.x && s.y === food.y));
+        }
+
+        function update() {
+            if (gameOver) return;
+
+            direction = { ...nextDirection };
+
+            if (direction.x === 0 && direction.y === 0) {
+                draw();
+                return;
+            }
+
+            const head = {
+                x: snake[0].x + direction.x,
+                y: snake[0].y + direction.y
+            };
+
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                endGame();
+                return;
+            }
+
+            if (snake.some(s => s.x === head.x && s.y === head.y)) {
+                endGame();
+                return;
+            }
+
+            snake.unshift(head);
+
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                scoreEl.textContent = 'Score: ' + score;
+                placeFood();
+            } else {
+                snake.pop();
+            }
+
+            draw();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#f00';
+            ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 1, gridSize - 1);
+
+            snake.forEach((segment, i) => {
+                ctx.fillStyle = i === 0 ? '#0f0' : '#0a0';
+                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 1, gridSize - 1);
+            });
+        }
+
+        function endGame() {
+            gameOver = true;
+            clearInterval(intervalId);
+            messageEl.textContent = 'Game Over! Press Space to restart';
+            messageEl.style.display = 'block';
+        }
+
+        document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowUp':
+                    if (direction.y !== 1) nextDirection = { x: 0, y: -1 };
+                    break;
+                case 'ArrowDown':
+                    if (direction.y !== -1) nextDirection = { x: 0, y: 1 };
+                    break;
+                case 'ArrowLeft':
+                    if (direction.x !== 1) nextDirection = { x: -1, y: 0 };
+                    break;
+                case 'ArrowRight':
+                    if (direction.x !== -1) nextDirection = { x: 1, y: 0 };
+                    break;
+                case ' ':
+                    if (gameOver) init();
+                    break;
+            }
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
         });
+
+        init();
     </script>
 </body>
 </html>
