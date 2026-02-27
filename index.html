@@ -3,150 +3,443 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snake</title>
+    <title>emLab Fish Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --blue:   #3E7EC5;
+            --green:  #54A051;
+            --orange: #F2943A;
+            --teal:   #2E9E8C;
+            --deep:   #0A1628;
+            --mid:    #0F2440;
+            --ink:    #F0F8FF;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            margin: 0;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            height: 100vh;
-            background: #111;
-            font-family: monospace;
-            color: #0f0;
+            justify-content: center;
+            min-height: 100vh;
+            background: radial-gradient(ellipse at 50% 0%, #0F2A48 0%, var(--deep) 70%);
+            font-family: 'Montserrat', 'Helvetica Neue', sans-serif;
+            color: var(--ink);
+            overflow: hidden;
         }
+
+        /* Floating bubbles */
+        .bubbles { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+        .bubble {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(62,126,197,0.07);
+            animation: rise linear infinite;
+        }
+        @keyframes rise {
+            from { bottom: -60px; opacity: 0; }
+            10%  { opacity: 1; }
+            90%  { opacity: 0.4; }
+            to   { bottom: 110%; opacity: 0; }
+        }
+
+        header {
+            position: relative; z-index: 10;
+            text-align: center;
+            margin-bottom: 14px;
+        }
+
+        .logo-row {
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            margin-bottom: 6px;
+        }
+
+        /* Recreation of emlab four-quadrant circle logo */
+        .logo-quad {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .logo-quad div {
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; line-height: 1;
+        }
+        .q1 { background: var(--blue); }
+        .q2 { background: var(--green); }
+        .q3 { background: var(--orange); }
+        .q4 { background: var(--teal); }
+
+        .brand { font-size: 30px; font-weight: 700; letter-spacing: 1px; }
+        .brand em { font-style: normal; color: var(--teal); }
+        .bren {
+            font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+            color: rgba(240,248,255,0.4);
+        }
+        .game-title {
+            font-size: 11px; letter-spacing: 4px; text-transform: uppercase;
+            color: rgba(240,248,255,0.5); margin-top: 2px;
+        }
+
+        #game-wrap { position: relative; z-index: 10; }
+
+        #hud {
+            display: flex; justify-content: space-between; align-items: center;
+            width: 420px; margin-bottom: 10px;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(62,126,197,0.25);
+            border-radius: 8px;
+        }
+        .hud-label {
+            font-size: 9px; letter-spacing: 2.5px; text-transform: uppercase;
+            color: rgba(240,248,255,0.4);
+            margin-bottom: 2px;
+        }
+        #score-val   { font-size: 22px; font-weight: 700; color: var(--orange); }
+        #depth-val   { font-size: 11px; font-weight: 600; color: rgba(240,248,255,0.5); letter-spacing: 1px; }
+        #best-val    { font-size: 18px; font-weight: 700; color: var(--teal); }
+
         canvas {
-            border: 2px solid #0f0;
+            display: block;
+            border-radius: 10px;
+            border: 1px solid rgba(46,158,140,0.35);
+            box-shadow: 0 0 40px rgba(46,158,140,0.12), 0 8px 32px rgba(0,0,0,0.6);
         }
-        #score {
-            position: absolute;
-            top: 20px;
-            font-size: 24px;
+
+        /* Overlay */
+        #overlay {
+            position: absolute; inset: 0;
+            border-radius: 10px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: rgba(10,22,40,0.88);
+            backdrop-filter: blur(6px);
         }
-        #message {
-            position: absolute;
-            font-size: 28px;
-            display: none;
+        #overlay.hidden { display: none; }
+
+        #overlay-icon { font-size: 42px; margin-bottom: 10px; }
+        #overlay-title {
+            font-size: 22px; font-weight: 700; letter-spacing: 2px;
+            margin-bottom: 6px;
+        }
+        #overlay-msg {
+            font-size: 13px; color: rgba(240,248,255,0.55);
+            text-align: center; line-height: 1.7;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            padding: 11px 34px;
+            border: none; border-radius: 5px;
+            background: var(--teal);
+            color: white;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 13px; font-weight: 700;
+            letter-spacing: 2.5px; text-transform: uppercase;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+        }
+        .btn:hover  { background: #35B5A0; transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+
+        footer {
+            position: relative; z-index: 10;
+            margin-top: 14px;
+            font-size: 9px; letter-spacing: 2.5px; text-transform: uppercase;
+            color: rgba(240,248,255,0.2);
         }
     </style>
 </head>
 <body>
-    <div id="score">Score: 0</div>
-    <canvas id="game" width="400" height="400"></canvas>
-    <div id="message"></div>
-    <script>
-        const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
-        const scoreEl = document.getElementById('score');
-        const messageEl = document.getElementById('message');
-        const gridSize = 20;
-        const tileCount = canvas.width / gridSize;
 
-        let snake, direction, nextDirection, food, score, gameOver, intervalId;
+<div class="bubbles" id="bubbles"></div>
 
-        function init() {
-            snake = [{ x: 10, y: 10 }];
-            direction = { x: 0, y: 0 };
-            nextDirection = { x: 0, y: 0 };
-            score = 0;
-            gameOver = false;
-            messageEl.style.display = 'none';
-            placeFood();
-            if (intervalId) clearInterval(intervalId);
-            intervalId = setInterval(update, 100);
+<header>
+    <div class="logo-row">
+        <div class="logo-quad">
+            <div class="q1">🌧</div>
+            <div class="q2">🌿</div>
+            <div class="q3">👥</div>
+            <div class="q4">🐟</div>
+        </div>
+        <div>
+            <div class="brand">em<em>Lab</em></div>
+            <div class="bren">UC Santa Barbara · Bren School</div>
+        </div>
+    </div>
+    <div class="game-title">Fish Tracker Field Game</div>
+</header>
+
+<div id="game-wrap">
+    <div id="hud">
+        <div>
+            <div class="hud-label">Species Tagged</div>
+            <div id="score-val">0</div>
+        </div>
+        <div style="text-align:center">
+            <div class="hud-label">Current Depth</div>
+            <div id="depth-val">—</div>
+        </div>
+        <div style="text-align:right">
+            <div class="hud-label">Session Best</div>
+            <div id="best-val">0</div>
+        </div>
+    </div>
+
+    <canvas id="game" width="420" height="420"></canvas>
+
+    <div id="overlay">
+        <div id="overlay-icon">🌊</div>
+        <div id="overlay-title" style="color: var(--teal)">emLab Fish Tracker</div>
+        <div id="overlay-msg">
+            Navigate your research drone through the ocean<br>
+            and tag as many species as possible.<br>
+            Use arrow keys · Space to restart
+        </div>
+        <button class="btn" id="start-btn">Deploy Drone</button>
+    </div>
+</div>
+
+<footer>emLab · Environmental Markets Lab · UCSB Bren School of Environmental Science &amp; Management</footer>
+
+<script>
+// ── Bubbles background ──────────────────────────────────────────────────────
+(function() {
+    const wrap = document.getElementById('bubbles');
+    for (let i = 0; i < 22; i++) {
+        const b = document.createElement('div');
+        b.className = 'bubble';
+        const sz = 4 + Math.random() * 18;
+        b.style.cssText = `width:${sz}px;height:${sz}px;left:${Math.random()*100}%;`
+            + `animation-duration:${7+Math.random()*14}s;`
+            + `animation-delay:${Math.random()*14}s;`;
+        wrap.appendChild(b);
+    }
+})();
+
+// ── Game constants ──────────────────────────────────────────────────────────
+const canvas   = document.getElementById('game');
+const ctx      = canvas.getContext('2d');
+const scoreEl  = document.getElementById('score-val');
+const bestEl   = document.getElementById('best-val');
+const depthEl  = document.getElementById('depth-val');
+const overlay  = document.getElementById('overlay');
+const oIcon    = document.getElementById('overlay-icon');
+const oTitle   = document.getElementById('overlay-title');
+const oMsg     = document.getElementById('overlay-msg');
+const startBtn = document.getElementById('start-btn');
+
+const GRID = 21;
+const TILE = canvas.width / GRID;
+
+const SPEEDS = [
+    { label: 'Intertidal',  ms: 130 },
+    { label: 'Nearshore',   ms: 108 },
+    { label: 'Offshore',    ms: 88  },
+    { label: 'Deep Sea',    ms: 68  },
+    { label: 'Hadal Zone',  ms: 50  },
+];
+
+function speedLevel(s) {
+    if (s < 5)  return 0;
+    if (s < 12) return 1;
+    if (s < 22) return 2;
+    if (s < 35) return 3;
+    return 4;
+}
+
+// ── State ───────────────────────────────────────────────────────────────────
+let snake, dir, nextDir, food, score, best, alive, intervalId, pulse;
+
+best = parseInt(localStorage.getItem('emlabFishTrackerBest') || '0');
+bestEl.textContent = best;
+
+// ── Init ────────────────────────────────────────────────────────────────────
+function init() {
+    snake    = [{ x:11,y:10 }, { x:10,y:10 }, { x:9,y:10 }];
+    dir      = { x:1, y:0 };
+    nextDir  = { x:1, y:0 };
+    score    = 0;
+    alive    = true;
+    pulse    = 0;
+    scoreEl.textContent = '0';
+    depthEl.textContent = SPEEDS[0].label;
+    overlay.classList.add('hidden');
+    placeFood();
+    if (intervalId) clearInterval(intervalId);
+    intervalId = setInterval(tick, SPEEDS[0].ms);
+}
+
+function placeFood() {
+    do {
+        food = {
+            x: Math.floor(Math.random() * GRID),
+            y: Math.floor(Math.random() * GRID)
+        };
+    } while (snake.some(s => s.x === food.x && s.y === food.y));
+}
+
+// ── Game loop ────────────────────────────────────────────────────────────────
+function tick() {
+    if (!alive) return;
+    dir = { ...nextDir };
+
+    const head = {
+        x: snake[0].x + dir.x,
+        y: snake[0].y + dir.y
+    };
+
+    // Wall collision
+    if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID) {
+        endGame(); return;
+    }
+    // Self collision
+    if (snake.some(s => s.x === head.x && s.y === head.y)) {
+        endGame(); return;
+    }
+
+    snake.unshift(head);
+
+    if (head.x === food.x && head.y === food.y) {
+        score++;
+        scoreEl.textContent = score;
+        if (score > best) {
+            best = score;
+            bestEl.textContent = best;
+            localStorage.setItem('emlabFishTrackerBest', best);
         }
+        placeFood();
+        const lvl = speedLevel(score);
+        depthEl.textContent = SPEEDS[lvl].label;
+        clearInterval(intervalId);
+        intervalId = setInterval(tick, SPEEDS[lvl].ms);
+    } else {
+        snake.pop();
+    }
 
-        function placeFood() {
-            do {
-                food = {
-                    x: Math.floor(Math.random() * tileCount),
-                    y: Math.floor(Math.random() * tileCount)
-                };
-            } while (snake.some(s => s.x === food.x && s.y === food.y));
+    pulse += 0.14;
+    draw();
+}
+
+// ── Draw ─────────────────────────────────────────────────────────────────────
+function draw() {
+    const W = canvas.width, H = canvas.height;
+
+    // Ocean background gradient
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#0C1E38');
+    bg.addColorStop(1, '#081422');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // Subtle grid
+    ctx.strokeStyle = 'rgba(62,126,197,0.06)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= GRID; i++) {
+        ctx.beginPath(); ctx.moveTo(i*TILE, 0); ctx.lineTo(i*TILE, H); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i*TILE); ctx.lineTo(W, i*TILE); ctx.stroke();
+    }
+
+    // Food glow
+    if (food) {
+        const fx = food.x * TILE + TILE / 2;
+        const fy = food.y * TILE + TILE / 2;
+        const glowR = TILE * (0.9 + Math.sin(pulse) * 0.35);
+        const grd = ctx.createRadialGradient(fx, fy, 0, fx, fy, glowR);
+        grd.addColorStop(0, 'rgba(242,148,58,0.45)');
+        grd.addColorStop(1, 'rgba(242,148,58,0)');
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(fx, fy, glowR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Fish emoji food
+        ctx.font = `${Math.round(TILE * 0.85)}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🐠', fx, fy + 1);
+    }
+
+    // Snake segments
+    snake.forEach((seg, i) => {
+        // Gradient: blue head → teal → darker teal tail
+        const t = i / Math.max(snake.length - 1, 1);
+        const r = Math.round(62  + (20  - 62)  * t);
+        const g = Math.round(126 + (130 - 126) * t);
+        const b = Math.round(197 + (100 - 197) * t);
+
+        const margin = 1.5;
+        const radius = i === 0 ? 5 : 3;
+        const x = seg.x * TILE + margin;
+        const y = seg.y * TILE + margin;
+        const w = TILE - margin * 2;
+        const h = TILE - margin * 2;
+
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, radius);
+        ctx.fill();
+
+        // Eyes on head
+        if (i === 0) {
+            const cx = seg.x * TILE + TILE / 2;
+            const cy = seg.y * TILE + TILE / 2;
+            let ex1, ey1, ex2, ey2;
+            if      (dir.x ===  1) { ex1=cx+TILE*.12; ey1=cy-TILE*.17; ex2=cx+TILE*.12; ey2=cy+TILE*.17; }
+            else if (dir.x === -1) { ex1=cx-TILE*.12; ey1=cy-TILE*.17; ex2=cx-TILE*.12; ey2=cy+TILE*.17; }
+            else if (dir.y === -1) { ex1=cx-TILE*.17; ey1=cy-TILE*.12; ex2=cx+TILE*.17; ey2=cy-TILE*.12; }
+            else                   { ex1=cx-TILE*.17; ey1=cy+TILE*.12; ex2=cx+TILE*.17; ey2=cy+TILE*.12; }
+
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.beginPath(); ctx.arc(ex1,ey1,2.2,0,Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(ex2,ey2,2.2,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#081422';
+            ctx.beginPath(); ctx.arc(ex1+.5,ey1+.5,1.1,0,Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(ex2+.5,ey2+.5,1.1,0,Math.PI*2); ctx.fill();
         }
+    });
+}
 
-        function update() {
-            if (gameOver) return;
+// ── End game ─────────────────────────────────────────────────────────────────
+function endGame() {
+    alive = false;
+    clearInterval(intervalId);
 
-            direction = { ...nextDirection };
+    const msgs = {
+        0:  ['Mission Aborted', '🔴', 'The drone collided before tagging any species.\nAnalyze conditions and redeploy.', 'Redeploy', '#F2943A'],
+        1:  ['Survey Complete', '🌊', `Tagged <strong>${score}</strong> species this survey.\nKeep exploring — the ocean has more to offer.`, 'Try Again', '#3E7EC5'],
+        2:  ['Good Field Data', '📊', `Tagged <strong>${score}</strong> species. Solid dataset.\nCan you reach deeper, faster waters?`, 'Dive Deeper', '#54A051'],
+        3:  ['Exceptional Research', '🏆', `Tagged <strong>${score}</strong> species!\nOutstanding fieldwork — emLab is impressed.`, 'Deploy Again', '#2E9E8C'],
+    };
+    const tier = score === 0 ? 0 : score < 8 ? 1 : score < 20 ? 2 : 3;
+    const [title, icon, msg, btn, color] = msgs[tier];
 
-            if (direction.x === 0 && direction.y === 0) {
-                draw();
-                return;
-            }
+    oIcon.textContent  = icon;
+    oTitle.textContent = title;
+    oTitle.style.color = color;
+    oMsg.innerHTML     = msg.replace(/\n/g, '<br>');
+    startBtn.textContent = btn;
+    overlay.classList.remove('hidden');
+}
 
-            const head = {
-                x: snake[0].x + direction.x,
-                y: snake[0].y + direction.y
-            };
+// ── Controls ──────────────────────────────────────────────────────────────────
+startBtn.addEventListener('click', init);
 
-            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
-                endGame();
-                return;
-            }
-
-            if (snake.some(s => s.x === head.x && s.y === head.y)) {
-                endGame();
-                return;
-            }
-
-            snake.unshift(head);
-
-            if (head.x === food.x && head.y === food.y) {
-                score++;
-                scoreEl.textContent = 'Score: ' + score;
-                placeFood();
-            } else {
-                snake.pop();
-            }
-
-            draw();
-        }
-
-        function draw() {
-            ctx.fillStyle = '#111';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.fillStyle = '#f00';
-            ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 1, gridSize - 1);
-
-            snake.forEach((segment, i) => {
-                ctx.fillStyle = i === 0 ? '#0f0' : '#0a0';
-                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 1, gridSize - 1);
-            });
-        }
-
-        function endGame() {
-            gameOver = true;
-            clearInterval(intervalId);
-            messageEl.textContent = 'Game Over! Press Space to restart';
-            messageEl.style.display = 'block';
-        }
-
-        document.addEventListener('keydown', (e) => {
-            switch (e.key) {
-                case 'ArrowUp':
-                    if (direction.y !== 1) nextDirection = { x: 0, y: -1 };
-                    break;
-                case 'ArrowDown':
-                    if (direction.y !== -1) nextDirection = { x: 0, y: 1 };
-                    break;
-                case 'ArrowLeft':
-                    if (direction.x !== 1) nextDirection = { x: -1, y: 0 };
-                    break;
-                case 'ArrowRight':
-                    if (direction.x !== -1) nextDirection = { x: 1, y: 0 };
-                    break;
-                case ' ':
-                    if (gameOver) init();
-                    break;
-            }
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
-                e.preventDefault();
-            }
-        });
-
-        init();
-    </script>
+document.addEventListener('keydown', e => {
+    switch (e.key) {
+        case 'ArrowUp':    if (dir.y !==  1) nextDir = { x:0,  y:-1 }; break;
+        case 'ArrowDown':  if (dir.y !== -1) nextDir = { x:0,  y:1  }; break;
+        case 'ArrowLeft':  if (dir.x !==  1) nextDir = { x:-1, y:0  }; break;
+        case 'ArrowRight': if (dir.x !== -1) nextDir = { x:1,  y:0  }; break;
+        case ' ':          if (!alive) init(); break;
+    }
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+});
+</script>
 </body>
 </html>
